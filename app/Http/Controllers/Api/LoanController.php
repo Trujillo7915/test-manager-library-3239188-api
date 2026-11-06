@@ -117,7 +117,7 @@ class LoanController extends Controller
         }
 
         // Operación atómica en BD
-        $now = Carbon::now('UTC');
+        $now = $request->has('loaned_at') ? Carbon::parse($request->input('loaned_at')) : Carbon::now('UTC');
         $dueAt = (clone $now)->addDays(14); // CA-06.6: loaned_at + 14 días
 
         $loan = null;
