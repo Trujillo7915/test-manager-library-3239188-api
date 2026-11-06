@@ -1,50 +1,86 @@
 # test-manager-library-3239188-api
 
-> **Prueba técnica · Ficha ADSO 3239188**
-> Horario: **jueves 5 de noviembre de 2026, de 7:00 p. m. a 11:00 p. m.** (hora Colombia). Entrega a las **11:00 p. m.**
+> **Prueba técnica SDD · Ficha ADSO 3239188**  
+> Backend oficial en **PHP (Laravel)** para *Manager Library*.
 
-Este repositorio es el **backend** de *Manager Library*, en **PHP con Laravel**. **Empieza vacío a propósito**: se construye en el fork de cada aprendiz.
+Este repositorio contiene la implementación completa del backend de *Manager Library*, desarrollado estrictamente bajo la metodología **SDD (*Spec-Driven Development*)** traduciendo la especificación de referencia a **Laravel 11**.
 
-## Instrucciones
+---
 
-Cada aprendiz debe **crear el fork** de los seis repositorios del proyecto y **resolver el proyecto
-con el spec planteado**.
+## 1. Cumplimiento de la Constitución y Decisiones de Arquitectura
 
-1. Hacer fork, a su cuenta de GitHub, de cada repositorio de la tabla del final.
-2. Leer el spec en [`test-manager-library-3239188-docs`](https://github.com/code-sena/test-manager-library-3239188-docs).
-   Se entrega en dos versiones: `spec-python/` y `spec-.net/`.
-3. Desarrollar en los forks.
+* **Artículo I a IV (Arquitectura Hexagonal & SOLID):** Separación de dominios, servicios de aplicación y controladores desacoplados.
+* **Artículo V & ADR-001 (Propiedad del esquema):** Todo el DDL de la base de datos (tablas, índices, llaves foráneas y semilla) pertenece y es ejecutado por las migraciones de este repositorio.
+* **Artículo VI & ADR-002 (Invariantes de motor y concurrencia):** 
+  * Restricción `CHECK (available_copies >= 0 AND available_copies <= total_copies)`.
+  * Restricción `CHECK (total_copies >= 1)`.
+  * Índice único parcial `(isbn) WHERE deleted_at IS NULL`.
+* **Artículo VII (Lo derivado se calcula):** El estado del préstamo (`open`, `overdue`, `closed`) y los días de retraso (`days_late`) se calculan en tiempo de ejecución; no existen columnas para ellos en la base de datos.
+* **Artículo VIII & ADR-004 (Valores congelados):** La línea de préstamo (`loan_item`) congela el título, ISBN y nombre de categoría del instante del préstamo. El reporte de más prestados agrupa sobre estos valores congelados.
+* **Artículo IX (Seguridad y Secretos):** Contraseñas hasheadas con Bcrypt; nunca viajan en claro ni aparecen en respuestas HTTP o logs.
+* **Cuerpo de Error Único:** Todo error de negocio o validación responde bajo el estándar JSON:
+  ```json
+  {
+    "code": "BOOK_NOT_AVAILABLE",
+    "message": "...",
+    "details": []
+  }
+  ```
 
-## El reto se desarrolla con React y PHP (Laravel)
+---
 
-El spec está escrito para Python y para .NET, pero el reto **no** se hace en esos lenguajes:
+## 2. Catálogo de Endpoints Implementados (`/api/v1`)
 
-| Capa | Tecnología del reto |
-|---|---|
-| Frontend | React |
-| Backend | PHP con Laravel |
+| Método | Ruta | Rol | Descripción |
+|---|---|---|---|
+| `GET` | `/health` | Público | Comprobación de salud: `{"status":"ok"}` |
+| `POST` | `/auth/login` | Público | Inicio de sesión, retorna JWT de 8 horas |
+| `POST` | `/users` | Admin | Da de alta bibliotecarios (`librarian`) |
+| `GET` | `/categories` | Autenticado | Lista las 5 categorías sembradas |
+| `GET` | `/books` | Autenticado | Búsqueda parcial (`q`), categoría y paginado |
+| `GET` | `/books/{id}` | Autenticado | Detalle de libro activo |
+| `POST` | `/books` | Admin | Crea libro con ejemplares disponibles = total |
+| `PUT` | `/books/{id}` | Admin | Modifica datos y ajusta stock en diferencia |
+| `DELETE` | `/books/{id}` | Admin | Baja lógica (impide baja si hay préstamos abiertos) |
+| `PUT` | `/books/{id}/cover` | Admin | Sube portada JPG/PNG (máx 2 MB) |
+| `DELETE` | `/books/{id}/cover` | Admin | Elimina portada |
+| `GET` | `/books/{id}/cover` | Autenticado | Obtiene binario de la portada |
+| `GET` | `/members` | Admin, Librarian | Lista y busca socios por nombre/documento |
+| `GET` | `/members/{id}` | Admin, Librarian | Detalle de socio con conteo de préstamos activos |
+| `POST` | `/members` | Admin, Librarian | Registra socio con documento único |
+| `POST` | `/loans` | Admin, Librarian | Presta 1 a 3 libros (valida límite de 3 y cero vencidos) |
+| `GET` | `/loans` | Admin, Librarian | Lista préstamos con filtros y estado calculado |
+| `GET` | `/loans/{id}` | Admin, Librarian | Detalle de préstamo con sus líneas |
+| `POST` | `/loans/{id}/items/{itemId}/return` | Admin, Librarian | Devolución por línea y reposición de ejemplar |
+| `GET` | `/loans/overdue` | Admin, Librarian | Líneas vencidas con días de retraso calculados |
+| `GET` | `/reports/most-borrowed` | Admin | Reporte agregado por valores congelados |
 
-Lo que el spec define sobre el negocio —historias, criterios de aceptación, reglas, contrato de la
-API, modelo de datos— se respeta. Lo que define sobre la tecnología se traduce a React y Laravel.
+---
 
-## La prueba no consiste en escribir el código
+## 3. Puesta en Marcha
 
-El propósito principal es ver la **capacidad de desempeño con SDD** (*Spec-Driven Development*,
-desarrollo guiado por especificación): cómo se lee, se interpreta y se aplica una especificación
-para llevarla a un stack distinto. El código es el medio, no el fin.
+1. **Configurar Entorno:**
+   ```bash
+   cp .env.example .env
+   ```
 
-## Entrega
+2. **Instalar Dependencias:**
+   ```bash
+   composer install
+   ```
 
-Cuenta lo que quede **subido a los forks antes de las 11:00 p. m.** Lo que llegue después no se revisa.
-No hay prórroga: suban avances parciales con commits pequeños durante la prueba.
+3. **Ejecutar Migraciones y Semillas:**
+   ```bash
+   php artisan migrate --seed
+   ```
 
-## Los seis repositorios
+4. **Iniciar Servidor de Desarrollo:**
+   ```bash
+   php artisan serve --port=8000
+   ```
 
-| Repositorio | Qué va ahí |
-|---|---|
-| [`test-manager-library-3239188-docs`](https://github.com/code-sena/test-manager-library-3239188-docs) | El spec: `spec-python/` y `spec-.net/` |
-| [`test-manager-library-3239188-api`](https://github.com/code-sena/test-manager-library-3239188-api) | Backend en PHP (Laravel) |
-| [`test-manager-library-3239188-app`](https://github.com/code-sena/test-manager-library-3239188-app) | Frontend en React |
-| [`test-manager-library-3239188-page`](https://github.com/code-sena/test-manager-library-3239188-page) | Sitio público estático de presentación |
-| [`test-manager-library-3239188-infra`](https://github.com/code-sena/test-manager-library-3239188-infra) | Contenedores, red, volúmenes y motor de base de datos vacío |
-| [`test-manager-library-3239188-tool`](https://github.com/code-sena/test-manager-library-3239188-tool) | Utilidades: sembrador de datos de demostración |
+O ejecutando con Docker:
+```bash
+docker build -t manager-library-api .
+docker run -p 8000:8000 --env-file .env manager-library-api
+```
